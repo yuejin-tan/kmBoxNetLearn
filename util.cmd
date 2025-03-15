@@ -12,4 +12,4 @@ conda activate can_dev
 
 conda install python
 
-pip install pyqt5 numpy scipy matplotlib canlib pyinstaller pyqt5-tools pyqt5-stubs autopep8
+pip install pyqt5 numpy scipy matplotlib canlib pyinstaller pyqt5-tools pyqt5-stubs autopep8 keyboard
