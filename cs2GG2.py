@@ -11,6 +11,8 @@ import struct
 import kmbox_para
 import keyboard
 import math
+import pickle
+
 from enum import Enum
 
 VERSION_STR = "cs2GunGod V0.2"
@@ -28,23 +30,61 @@ class Guns(Enum):
     AK = 1
     A4 = 2
     A1 = 3
-    Pistol = 4
+    MAC10 = 4
+    MP9 = 5
+    PP = 6
+    GALI = 7
 
 
 moniStop = False
-isLearning = True
+isLearning = False
 learnFlg = 0
 shootFlg = 0
 recoilNo = 0
 gAccMax = 40000
+gGuns = Guns.AK
 
+gunStartCheatTime = [
+    1e6,    # off
+    0.25,  # AK
+    0.32,  # A4
+    0.35,  # A1
+    0.2,    # MAC10
+    0.2,    # MP9
+    0.25,    # PP
+    0.25,    # GALI
+]
 gunRecord = [
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # off
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # AK
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # A4
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # A1
-    [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # Pistol
+    [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # MAC10
+    [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # MP9
+    [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # PP
+    [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # GALI
 ]
+
+try:
+    with open("ak.pkl", "rb") as f:
+        gunRecord[Guns.AK.value] = pickle.load(f)
+    with open("a4.pkl", "rb") as f:
+        gunRecord[Guns.A4.value] = pickle.load(f)
+    with open("a1.pkl", "rb") as f:
+        gunRecord[Guns.A1.value] = pickle.load(f)
+    with open("mac10.pkl", "rb") as f:
+        gunRecord[Guns.MAC10.value] = pickle.load(f)
+    with open("mp9.pkl", "rb") as f:
+        gunRecord[Guns.MP9.value] = pickle.load(f)
+    with open("pp.pkl", "rb") as f:
+        gunRecord[Guns.PP.value] = pickle.load(f)
+    with open("gali.pkl", "rb") as f:
+        gunRecord[Guns.GALI.value] = pickle.load(f)
+    print("gunRecord read ok")
+
+except Exception as e:
+    print("gunRecord not init")
+    print(e)
 
 
 class NTD():
@@ -60,11 +100,10 @@ class NTD():
         self.a = 0
 
     def calc(self, xTar, dT):
-        temp = self.x-xTar + self.v*abs(self.v)/self.r*0.5
-        self.a = (self.a + random.uniform(0, 2) *
-                  (-self.r if temp > 0 else self.r))*0.5
+        temp = min(max(-self.x + xTar - self.v*abs(self.v)/self.r*0.5, -1), 1)
+        self.a = 0.5*self.a + 0.5 * self.r * temp
         self.v += dT*self.a
-        self.x += dT*self.v + random.uniform(-1, 1)
+        self.x += dT*self.v
         return self.x
 
 
@@ -76,7 +115,7 @@ class kmboxMgr():
         self.mac = mac
         self.portMoni = portMoni
 
-        self.guns = Guns.AK
+        self.guns = Guns.off
 
         self.udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_server.settimeout(0.1)
@@ -143,6 +182,8 @@ class kmboxMgr():
         global learnFlg
         global shootFlg
         global recoilNo
+        global gAccMax
+        global gGuns
 
         # 开启轮询
         self.sendPack(kmbox_para.CMD_monitor, self.portMoni | 0xaa550000)
@@ -218,6 +259,13 @@ class kmboxMgr():
                 # print(
                 #     f"\rself.vx, self.vy, self.wheel, self.mbtn={self.vx:.2f},{self.vy:.2f},{self.wheel},{self.mbtn}                  ", end="")
 
+                if (self.wheel < 0):
+                    self.guns = Guns.off
+                    print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+                elif (self.wheel > 0):
+                    self.guns = gGuns
+                    print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+
                 self.dx = 0
                 self.dy = 0
                 self.wheel = 0
@@ -260,37 +308,73 @@ class kmboxMgr():
                         self.yyshoot = 0
                         self.ntdX1 = NTD(gAccMax, 0, 0)
                         self.ntdY1 = NTD(gAccMax, 0, 0)
+                        self.randomPhiX = random.uniform(0, 2*math.pi)
+                        self.randomPhiY = random.uniform(0, 2*math.pi)
+                        self.randomOmegaX = random.uniform(1, 3)*2*math.pi
+                        self.randomOmegaY = random.uniform(0.3, 2)*2*math.pi
+                        self.randomAmpX = random.uniform(10, 20)
+                        self.randomAmpY = random.uniform(5, 10)
                         shootFlg = 1
                     elif (shootFlg == 1):
                         tarT = tNow-self.tshoot
                         tarX = int(self.ntdX1.calc(numpy.interp(
-                            tarT, gunRecord[self.guns.value][recoilNo][0], gunRecord[self.guns.value][recoilNo][1]), self.dt1))
+                            tarT, gunRecord[self.guns.value][recoilNo][0], gunRecord[self.guns.value][recoilNo][1] + self.randomAmpX*math.sin(self.randomOmegaX*tarT+self.randomPhiX)), self.dt1))
                         tarY = int(self.ntdY1.calc(numpy.interp(
-                            tarT, gunRecord[self.guns.value][recoilNo][0], gunRecord[self.guns.value][recoilNo][2]), self.dt1))
-                        self.mouseMove(tarX-self.xxshoot, tarY-self.yyshoot)
+                            tarT, gunRecord[self.guns.value][recoilNo][0], gunRecord[self.guns.value][recoilNo][2] + self.randomAmpY*math.sin(self.randomOmegaY*tarT+self.randomPhiY)), self.dt1))
+                        if (tarT > gunStartCheatTime[self.guns.value]):
+                            # 保证点射手感，前面不压枪
+                            self.mouseMove(tarX-self.xxshoot,
+                                           tarY-self.yyshoot)
+                            # print("1", end="")
                         self.xxshoot = tarX
                         self.yyshoot = tarY
                 else:
                     # 松开了，回正
                     if (shootFlg == 1):
                         shootFlg = 2
+                        if (self.yyshoot < 100):
+                            self.yyshoot = self.yyshoot/2
+                        else:
+                            self.yyshoot -= 50
                         self.ntdY2 = NTD(gAccMax, self.yyshoot, 0)
 
                 # 回正步骤是强制进行的
                 if (shootFlg == 2):
                     tarY = int(self.ntdY2.calc(0, self.dt1))
-                    # 完事了
-                    if (abs(tarY) < 3):
+                    if (abs(tarY) < 4 or tarT < gunStartCheatTime[self.guns.value]):
+                        # 完事了
                         shootFlg = 0
                         tarY = 0
-
-                    self.mouseMove(0, tarY-self.yyshoot)
+                    else:
+                        self.mouseMove(0, tarY-self.yyshoot)
+                        # print("2", end="")
                     self.yyshoot = tarY
-            # 退出判定
-            if keyboard.is_pressed('esc'):
-                moniStop = True
 
-            # print(f"\r gun:{self.guns},", end="")
+            # 退出判定
+            if keyboard.is_pressed('space'):
+                moniStop = True
+            # 换枪判断
+            if keyboard.is_pressed('z'):
+                gGuns = Guns.AK
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('x'):
+                gGuns = Guns.A4
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('c'):
+                gGuns = Guns.A1
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('v'):
+                gGuns = Guns.MAC10
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('b'):
+                gGuns = Guns.MP9
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('n'):
+                gGuns = Guns.PP
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('m'):
+                gGuns = Guns.GALI
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
 
         # 关闭监控
         self.sendPack(kmbox_para.CMD_monitor, 0)
