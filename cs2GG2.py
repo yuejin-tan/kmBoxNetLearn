@@ -1,3 +1,6 @@
+# AK z | A4 x | A1 c | 
+# xMAC10 v | MP9 b | PP n | GALI m 
+
 import threading
 import time
 import socket
@@ -66,7 +69,7 @@ gunRecord = [
 ]
 
 try:
-    with open("ak.pkl", "rb") as f:
+    with open("ak_2.pkl", "rb") as f:
         gunRecord[Guns.AK.value] = pickle.load(f)
     with open("a4.pkl", "rb") as f:
         gunRecord[Guns.A4.value] = pickle.load(f)
@@ -351,7 +354,7 @@ class kmboxMgr():
                     self.yyshoot = tarY
 
             # 退出判定
-            if keyboard.is_pressed('space'):
+            if keyboard.is_pressed('enter'):
                 moniStop = True
             # 换枪判断
             if keyboard.is_pressed('z'):
