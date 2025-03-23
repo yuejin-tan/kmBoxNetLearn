@@ -1,5 +1,5 @@
 # AK z | A4 x | A1 c | 
-# xMAC10 v | MP9 b | PP n | GALI m 
+# MAC10 v | MP9 b | PP n | GALI m 
 
 import threading
 import time
@@ -49,13 +49,13 @@ gGuns = Guns.AK
 
 gunStartCheatTime = [
     1e6,    # off
-    0.25,  # AK
-    0.32,  # A4
-    0.35,  # A1
-    0.2,    # MAC10
-    0.2,    # MP9
-    0.25,    # PP
-    0.25,    # GALI
+    0.15,  # AK
+    0.22,  # A4
+    0.25,  # A1
+    0.15,    # MAC10
+    0.15,    # MP9
+    0.15,    # PP
+    0.22,    # GALI
 ]
 gunRecord = [
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # off
@@ -69,7 +69,7 @@ gunRecord = [
 ]
 
 try:
-    with open("ak_2.pkl", "rb") as f:
+    with open("ak.pkl", "rb") as f:
         gunRecord[Guns.AK.value] = pickle.load(f)
     with open("a4.pkl", "rb") as f:
         gunRecord[Guns.A4.value] = pickle.load(f)
@@ -328,6 +328,8 @@ class kmboxMgr():
                             # 保证点射手感，前面不压枪
                             self.mouseMove(tarX-self.xxshoot,
                                            tarY-self.yyshoot)
+                        else:
+                            self.tarY0 = tarY
                             # print("1", end="")
                         self.xxshoot = tarX
                         self.yyshoot = tarY
@@ -335,16 +337,15 @@ class kmboxMgr():
                     # 松开了，回正
                     if (shootFlg == 1):
                         shootFlg = 2
-                        if (self.yyshoot < 100):
-                            self.yyshoot = self.yyshoot/2
-                        else:
-                            self.yyshoot -= 50
                         self.ntdY2 = NTD(gAccMax, self.yyshoot, 0)
+                        # print(f"yyshoot={self.yyshoot}")
+                        # print(f"tarY0={self.tarY0}")
 
                 # 回正步骤是强制进行的
                 if (shootFlg == 2):
-                    tarY = int(self.ntdY2.calc(0, self.dt1))
-                    if (abs(tarY) < 4 or tarT < gunStartCheatTime[self.guns.value]):
+                    tarY = int(self.ntdY2.calc(self.tarY0, self.dt1))
+                    # if (abs(self.ntdY2.v) < 10 or tarT < gunStartCheatTime[self.guns.value]):
+                    if (abs(tarY-self.tarY0) < 5 or tarT < gunStartCheatTime[self.guns.value]):
                         # 完事了
                         shootFlg = 0
                         tarY = 0
