@@ -1,5 +1,5 @@
-# AK z | A4 x | A1 c | 
-# MAC10 v | MP9 b | PP n | GALI m 
+# AK a | A4 s | A1 d | GALI f | FAMAS g
+# MAC10 z | MP9 x | PP c
 
 import threading
 import time
@@ -37,6 +37,7 @@ class Guns(Enum):
     MP9 = 5
     PP = 6
     GALI = 7
+    FAMAS = 8
 
 
 moniStop = False
@@ -45,17 +46,19 @@ learnFlg = 0
 shootFlg = 0
 recoilNo = 0
 gAccMax = 40000
+gAccMax2 = 8000
 gGuns = Guns.AK
 
 gunStartCheatTime = [
     1e6,    # off
-    0.15,  # AK
-    0.22,  # A4
-    0.25,  # A1
-    0.15,    # MAC10
-    0.15,    # MP9
-    0.15,    # PP
-    0.22,    # GALI
+    0.1,  # AK
+    0.18,  # A4
+    0.18,  # A1
+    0.1,    # MAC10
+    0.1,    # MP9
+    0.1,    # PP
+    0.18,    # GALI
+    0.18,    # FAMAS
 ]
 gunRecord = [
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # off
@@ -66,6 +69,7 @@ gunRecord = [
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # MP9
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # PP
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # GALI
+    [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # FAMAS
 ]
 
 try:
@@ -83,6 +87,8 @@ try:
         gunRecord[Guns.PP.value] = pickle.load(f)
     with open("gali.pkl", "rb") as f:
         gunRecord[Guns.GALI.value] = pickle.load(f)
+    with open("famas.pkl", "rb") as f:
+        gunRecord[Guns.FAMAS.value] = pickle.load(f)
     print("gunRecord read ok")
 
 except Exception as e:
@@ -186,6 +192,7 @@ class kmboxMgr():
         global shootFlg
         global recoilNo
         global gAccMax
+        global gAccMax2
         global gGuns
 
         # 开启轮询
@@ -309,43 +316,57 @@ class kmboxMgr():
                         self.tshoot = tNow
                         self.xxshoot = 0
                         self.yyshoot = 0
-                        self.ntdX1 = NTD(gAccMax, 0, 0)
-                        self.ntdY1 = NTD(gAccMax, 0, 0)
-                        self.randomPhiX = random.uniform(0, 2*math.pi)
-                        self.randomPhiY = random.uniform(0, 2*math.pi)
-                        self.randomOmegaX = random.uniform(1, 3)*2*math.pi
-                        self.randomOmegaY = random.uniform(0.3, 2)*2*math.pi
-                        self.randomAmpX = random.uniform(10, 20)
-                        self.randomAmpY = random.uniform(5, 10)
+                        self.ntdX1 = NTD(gAccMax2, 0, 0)
+                        self.ntdY1 = NTD(gAccMax2, 0, 0)
+                        self.randomPhiX1 = random.uniform(0, math.pi)
+                        self.randomPhiX2 = random.uniform(0, math.pi)
+                        self.randomPhiY1 = random.uniform(0, math.pi)
+                        self.randomPhiY2 = random.uniform(0, math.pi)
+                        self.randomOmegaX1 = random.uniform(0.1, 2)*2*math.pi
+                        self.randomOmegaX2 = random.uniform(0.1, 2)*2*math.pi
+                        self.randomOmegaY1 = random.uniform(0.1, 2)*2*math.pi
+                        self.randomOmegaY2 = random.uniform(0.1, 2)*2*math.pi
+                        self.randomAmpX1 = random.uniform(-10, 10)
+                        self.randomAmpX2 = random.uniform(-10, 10)
+                        self.randomAmpY1 = random.uniform(-8, 8)
+                        self.randomAmpY2 = random.uniform(-8, 8)
                         shootFlg = 1
                     elif (shootFlg == 1):
-                        tarT = tNow-self.tshoot
-                        tarX = int(self.ntdX1.calc(numpy.interp(
-                            tarT, gunRecord[self.guns.value][recoilNo][0], gunRecord[self.guns.value][recoilNo][1] + self.randomAmpX*math.sin(self.randomOmegaX*tarT+self.randomPhiX)), self.dt1))
-                        tarY = int(self.ntdY1.calc(numpy.interp(
-                            tarT, gunRecord[self.guns.value][recoilNo][0], gunRecord[self.guns.value][recoilNo][2] + self.randomAmpY*math.sin(self.randomOmegaY*tarT+self.randomPhiY)), self.dt1))
+                        tarT = min(tNow-self.tshoot,
+                                   gunRecord[self.guns.value][recoilNo][0][-1])
                         if (tarT > gunStartCheatTime[self.guns.value]):
                             # 保证点射手感，前面不压枪
-                            self.mouseMove(tarX-self.xxshoot,
-                                           tarY-self.yyshoot)
-                        else:
-                            self.tarY0 = tarY
-                            # print("1", end="")
-                        self.xxshoot = tarX
-                        self.yyshoot = tarY
+                            tarX0 = (numpy.interp(tarT, gunRecord[self.guns.value][recoilNo][0],
+                                                  gunRecord[self.guns.value][recoilNo][1]) +
+                                     self.randomAmpX1*math.sin(self.randomOmegaX1*tarT+self.randomPhiX1) +
+                                     self.randomAmpX2 * math.sin(self.randomOmegaX2*tarT+self.randomPhiX2))
+                            tarY0 = (numpy.interp(tarT, gunRecord[self.guns.value][recoilNo][0],
+                                                  gunRecord[self.guns.value][recoilNo][2]) +
+                                     self.randomAmpY1*math.sin(self.randomOmegaY1*tarT+self.randomPhiY1) +
+                                     self.randomAmpY2*math.sin(self.randomOmegaY2*tarT+self.randomPhiY2))
+                            tarX = self.ntdX1.calc(tarX0, self.dt1)
+                            tarY = self.ntdY1.calc(tarY0, self.dt1)
+                            moveX0 = tarX-self.xxshoot
+                            moveY0 = tarY-self.yyshoot
+                            #  去抖
+                            if (abs(moveX0) > 1.5 or abs(moveY0) > 1.5):
+                                moveX = int(moveX0)
+                                moveY = int(moveY0)
+                                self.mouseMove(moveX, moveY)
+                                self.xxshoot += moveX
+                                self.yyshoot += moveY
                 else:
                     # 松开了，回正
                     if (shootFlg == 1):
                         shootFlg = 2
                         self.ntdY2 = NTD(gAccMax, self.yyshoot, 0)
                         # print(f"yyshoot={self.yyshoot}")
-                        # print(f"tarY0={self.tarY0}")
 
                 # 回正步骤是强制进行的
                 if (shootFlg == 2):
-                    tarY = int(self.ntdY2.calc(self.tarY0, self.dt1))
+                    tarY = int(self.ntdY2.calc(0, self.dt1))
                     # if (abs(self.ntdY2.v) < 10 or tarT < gunStartCheatTime[self.guns.value]):
-                    if (abs(tarY-self.tarY0) < 5 or tarT < gunStartCheatTime[self.guns.value]):
+                    if (abs(tarY) < 4 or tarT < gunStartCheatTime[self.guns.value]):
                         # 完事了
                         shootFlg = 0
                         tarY = 0
@@ -358,26 +379,29 @@ class kmboxMgr():
             if keyboard.is_pressed('enter'):
                 moniStop = True
             # 换枪判断
-            if keyboard.is_pressed('z'):
+            if keyboard.is_pressed('a'):
                 gGuns = Guns.AK
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
-            if keyboard.is_pressed('x'):
+            if keyboard.is_pressed('s'):
                 gGuns = Guns.A4
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
-            if keyboard.is_pressed('c'):
+            if keyboard.is_pressed('d'):
                 gGuns = Guns.A1
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
-            if keyboard.is_pressed('v'):
+            if keyboard.is_pressed('z'):
                 gGuns = Guns.MAC10
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
-            if keyboard.is_pressed('b'):
+            if keyboard.is_pressed('x'):
                 gGuns = Guns.MP9
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
-            if keyboard.is_pressed('n'):
+            if keyboard.is_pressed('c'):
                 gGuns = Guns.PP
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
-            if keyboard.is_pressed('m'):
+            if keyboard.is_pressed('f'):
                 gGuns = Guns.GALI
+                print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
+            if keyboard.is_pressed('g'):
+                gGuns = Guns.FAMAS
                 print(f"\r now:{self.guns} globalGun:{gGuns}    ", end="")
 
         # 关闭监控
