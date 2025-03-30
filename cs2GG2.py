@@ -50,16 +50,17 @@ gAccMax2 = 8000
 gGuns = Guns.AK
 
 gunStartCheatTime = [
-    1e6,    # off
-    0.1,  # AK
-    0.18,  # A4
-    0.18,  # A1
-    0.1,    # MAC10
-    0.1,    # MP9
-    0.1,    # PP
-    0.18,    # GALI
-    0.18,    # FAMAS
+    1e6,     # off
+    0.08,    # AK
+    0.18,    # A4
+    0.18,    # A1
+    0.08,    # MAC10
+    0.08,    # MP9
+    0.08,    # PP
+    0.08,    # GALI
+    0.08,    # FAMAS
 ]
+
 gunRecord = [
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # off
     [[numpy.zeros(1), numpy.zeros(1), numpy.zeros(1)]],  # AK
@@ -328,22 +329,24 @@ class kmboxMgr():
                         self.randomOmegaY2 = random.uniform(0.1, 2)*2*math.pi
                         self.randomAmpX1 = random.uniform(-10, 10)
                         self.randomAmpX2 = random.uniform(-10, 10)
-                        self.randomAmpY1 = random.uniform(-8, 8)
-                        self.randomAmpY2 = random.uniform(-8, 8)
+                        self.randomAmpY1 = random.uniform(-15, 15)
+                        self.randomAmpY2 = random.uniform(-15, 15)
                         shootFlg = 1
                     elif (shootFlg == 1):
                         tarT = min(tNow-self.tshoot,
                                    gunRecord[self.guns.value][recoilNo][0][-1])
                         if (tarT > gunStartCheatTime[self.guns.value]):
                             # 保证点射手感，前面不压枪
+                            # 提升弹道精度，前0.5s不加入随机偏移，0.5s到1.5s逐步加入
+                            randomRatio = min(max(tarT-0.5, 0), 1)
                             tarX0 = (numpy.interp(tarT, gunRecord[self.guns.value][recoilNo][0],
                                                   gunRecord[self.guns.value][recoilNo][1]) +
-                                     self.randomAmpX1*math.sin(self.randomOmegaX1*tarT+self.randomPhiX1) +
-                                     self.randomAmpX2 * math.sin(self.randomOmegaX2*tarT+self.randomPhiX2))
+                                     self.randomAmpX1*math.sin(self.randomOmegaX1*tarT+self.randomPhiX1)*randomRatio +
+                                     self.randomAmpX2*math.sin(self.randomOmegaX2*tarT+self.randomPhiX2)*randomRatio)
                             tarY0 = (numpy.interp(tarT, gunRecord[self.guns.value][recoilNo][0],
                                                   gunRecord[self.guns.value][recoilNo][2]) +
-                                     self.randomAmpY1*math.sin(self.randomOmegaY1*tarT+self.randomPhiY1) +
-                                     self.randomAmpY2*math.sin(self.randomOmegaY2*tarT+self.randomPhiY2))
+                                     self.randomAmpY1*math.sin(self.randomOmegaY1*tarT+self.randomPhiY1)*randomRatio +
+                                     self.randomAmpY2*math.sin(self.randomOmegaY2*tarT+self.randomPhiY2)*randomRatio)
                             tarX = self.ntdX1.calc(tarX0, self.dt1)
                             tarY = self.ntdY1.calc(tarY0, self.dt1)
                             moveX0 = tarX-self.xxshoot
